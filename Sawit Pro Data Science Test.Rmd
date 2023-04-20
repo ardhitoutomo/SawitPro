@@ -1,0 +1,98 @@
+---
+title: "Sawit Pro Data Science Test"
+author: "Ardhito Utomo"
+date: "2023-04-20"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: 
+        collapsed: false
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    # css: style.css
+  fig_caption: yes
+  pdf_document:
+    latex_engine: xelatex
+    fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+rm(list = ls())
+options(scipen = 9999)
+```
+
+```{r}
+# Package
+library(tidyverse)
+library(data.table)
+library(GGally)
+```
+
+# Data
+```{r}
+dat <- fread("owid-covid-data.csv")
+```
+
+# Question 1
+
+Q: What is the probability of dying from COVID infection in France in March 2023 for a 25 year old? Draw the relevant correlation projections
+
+A:
+
+```{r}
+dat_fr_mar23 <- dat %>% 
+  filter(location == "France",
+         between(date, as.Date("2023-03-01"), as.Date("2023-03-31")))
+
+(dat_fr_mar23 %>% 
+  group_by(location) %>% 
+  summarise(new_deaths = sum(new_deaths),
+            population = max(population)) %>% 
+  ungroup() -> dat_fr_mar23sum)
+```
+
+Because we don't know about the age of people getting covid from the data, the positive rate from the data at that time, and we don't know about the proportion about age from the data, we take an external information. Based on [statista.com](https://www.statista.com/statistics/464032/distribution-population-age-group-france/), distribution of population in france as of January 1 2023 by age group, are 5.47% of population is between the age of 25 to 29 years old. Using that information, we can combine with new cases of March 2023 and population of France in March 2023.
+
+```{r}
+prob <- (dat_fr_mar23sum$new_deaths / dat_fr_mar23sum$population) * 0.0547 * 100
+
+prob
+```
+
+With that said, there's probably 0.000058% chance of a 25 year old person dying from covid in Franch on March 2023.
+
+
+# Question 2
+
+Q: What is the correlation between the number of deaths with age for the US, China, France and Germany?
+
+A:
+
+```{r}
+selected_countries <- c("United States", "China", "France", "Germany")
+
+(dat %>% 
+  filter(location %in% selected_countries) %>% 
+  select(location, total_deaths, new_deaths, median_age, aged_65_older, aged_70_older, population) %>% 
+  group_by(location) %>% 
+  summarise(total_deaths = max(total_deaths, na.rm = T),
+            median_deaths = median(new_deaths, na.rm = T),
+            median_age = median(median_age, na.rm = T),
+            aged_65_older = median(aged_65_older, na.rm = T),
+            ages_70_older = median(aged_70_older, na.rm = T),
+            population = max(population, na.rm = T)) %>%
+  ungroup() %>% 
+  mutate(death_per_population = total_deaths/population) -> dat_sum)
+```
+
+It's hard to find correlation with information we currently have. Because there's no proper information regarding age and at what age the people died because of covid. But, one of the possible way to do that is by creating a summarize data of each selected country, and create a correlation based on the summarized data.
+
+```{r}
+ggcorr(dat_sum, label = T, hjust = 1, layout.exp = 1, label_alpha = T)
+```
+
+With correlation plot, we can see that median_age has no correlation between median_deaths, total_deaths, nor death_per_population. But, aged_65_older and ages_70_older have a strong correlation between death_per_population (eventhough have no correlation to median_deaths and total_deaths). Putting it into words, it is made sense that with bigger amount of people aged 65++ in a country, the country also have a bigger number of deaths because of covid.
+
